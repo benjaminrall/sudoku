@@ -5,12 +5,15 @@ import time
 from personallib.camera import Camera
 from personallib.canvas import *
 
+from board import Board
+
 # Constants
 WIN_WIDTH = 800
 WIN_HEIGHT = 800
 FRAMERATE = 60
 TILE_SIZE = 50
 BOARD_SIZE = 9 * (TILE_SIZE + 2)
+BOARD_POS = (-BOARD_SIZE / 2, -BOARD_SIZE / 2)
 ICON_IMG = pygame.image.load(os.path.join("imgs", "icon.png"))
 
 # Pygame Setup
@@ -22,29 +25,18 @@ pygame.font.init()
 
 # Objects
 cam = Camera(win, 0, 0, 1)
-boardSurface = pygame.Surface((BOARD_SIZE, BOARD_SIZE))
 ui = Canvas(WIN_WIDTH, WIN_HEIGHT)
+board = Board(BOARD_POS, TILE_SIZE, Board.DIFFICULTIES["easy"], Board.DARK_MODE)
 
 # Variables
 running = True
+won = False
 
 # Methods
-def draw_board(cam, surface):
-    surface.fill((255, 255, 255))
-    # (3 + x, 0) (3 + x, n)
-    # (4 + 2x, 0) (4 + 2x, n)
-    # 
-    # ((5 + 3x) + 3 + x))
-    for c in range(0, BOARD_SIZE - (5 + 3 * TILE_SIZE), 5 + 3 * TILE_SIZE):
-        for x in range(3 + TILE_SIZE, 5 + 3 * TILE_SIZE, 1 + TILE_SIZE):
-            pygame.draw.line(surface, (0, 0, 0), (c + x, 0), (c + x, BOARD_SIZE))
-            pygame.draw.line(surface, (0, 0, 0), (0, c + x), (BOARD_SIZE, c + x))
-    for x in range(1, BOARD_SIZE, 5 + 3 * TILE_SIZE):
-        pygame.draw.line(surface, (0, 0, 0), (x, 0), (x, BOARD_SIZE), 3)
-        pygame.draw.line(surface, (0, 0, 0), (0, x), (BOARD_SIZE, x), 3)
-    cam.blit(surface, (-BOARD_SIZE / 2, -BOARD_SIZE / 2))
 
 # UI
+ui.add_element(Text("winText", (WIN_WIDTH / 2, WIN_HEIGHT - 100), "georgia", 40, "You Win! Press 'R' to restart.", (255, 255, 255), "centre"))
+ui.set_visible(False)
 
 # Main Loop
 if __name__ == '__main__':
@@ -57,12 +49,31 @@ if __name__ == '__main__':
                 running = False
                 pygame.quit()
                 exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEMOTION and not won:
+                board.hover(cam)
+            elif event.type == pygame.MOUSEBUTTONDOWN and not won:
                 if event.button == 1:
-                    pass
+                    board.select(cam)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r and won:
+                    won = False
+                    ui.set_visible(False)
+                    board = Board(BOARD_POS, TILE_SIZE, Board.DIFFICULTIES["hard"], Board.DARK_MODE)
+                elif board.selected:
+                    if event.key == pygame.K_BACKSPACE or event.key == pygame.K_DELETE:
+                        board.selectedTile.clear_number()
+                    else:
+                        board.selectedTile.set_number(event.key - 48)
 
-        win.fill((200, 200, 200))
+        if board.solution == board.toDict():
+            board.selected = None
+            board.hovering = None
+            won = True
+            ui.set_visible(True)
 
-        draw_board(cam, boardSurface)
+        win.fill((10, 10, 10))
+
+        board.draw(cam)
+        ui.update(cam)
 
         pygame.display.update()
