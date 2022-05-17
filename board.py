@@ -136,11 +136,9 @@ class Board:
             i = (i + 1) % len(validTiles)
         board[key] = x
         self.fromDict(board, True)
-        
 
-    def generate_solution(self):
-        board = {}
-        validTiles = [(c, r) for c in range(9) for r in range(9)]
+    def generate_solution(self, board = {}):
+        validTiles = [(c, r) for c in range(9) for r in range(9) if (c, r) not in board]
         while len(validTiles) > 0:
             random.shuffle(validTiles)
             tile = validTiles[0]
