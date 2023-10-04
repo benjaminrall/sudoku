@@ -1,6 +1,7 @@
 """Solves sudoku puzzles by representing them as an exact cover problem."""
 
 import numpy as np
+import sys
 
 class SudokuConstraints:
     """A class which uses a 2 dimensional doubly circular linked list to represent the constraints for solving a sudoku."""
@@ -200,20 +201,59 @@ class SudokuSolver():
         
         return sudoku
     
-sudokus = np.array([
-    np.load(f"data/very_easy_puzzle.npy"),
-    np.load(f"data/easy_puzzle.npy"),
-    np.load(f"data/medium_puzzle.npy"),
-    np.load(f"data/hard_puzzle.npy")
-])
+if __name__ == '__main__':
+    argv = sys.argv[1:]
+    
+    # Ensures command line argument for the sudoku puzzle to be solved is specified
+    if len(argv) == 0:
+        print(f"You must specify a sudoku puzzle to be solved as a command line argument.")
+        exit()
 
-solutions = np.array([
-    np.load(f"data/very_easy_solution.npy"),
-    np.load(f"data/easy_solution.npy"),
-    np.load(f"data/medium_solution.npy"),
-    np.load(f"data/hard_solution.npy")
-])
+    # Ensures the correct amount of command line arguments are specified
+    if len(argv) > 2:
+        print("There should be at most 2 command line arguments specified.")
+        exit()
 
-solver = SudokuSolver()
+    # Gets the sudoku string from command line arguments
+    sudoku_string = argv[0]
 
-print(solver(sudokus[0][0]))
+    # Ensures sudoku string is of the correct format
+    if len(sudoku_string) != 81 or not sudoku_string.isnumeric():
+        print("The sudoku puzzle must be represented as a string of 81 digits from 0-9.")
+        exit()
+
+    # Parses the optional print mode argument
+    print_mode = 0
+    if len(argv) > 1:
+        print_mode = argv[1]
+        if print_mode != '0' and print_mode != '1':
+            print("The second command line argument must be '0' or '1' specifying the output print mode.")
+            exit()
+        else:
+            print_mode = int(print_mode)
+
+    # Converts string input to a numpy array containing the sudoku
+    sudoku = np.array(list(sudoku_string), dtype=int).reshape((9, 9))
+
+    # Solves the given sudoku
+    solver = SudokuSolver()
+    solution = solver(sudoku)
+
+    # Outputs solution as a string in the same format as the input if print mode is 0
+    if print_mode == 0:
+        print(''.join(map(str, solution.reshape(-1))))
+        exit()
+
+    # Pretty prints the sudoku grid for easy reading
+    for y in range(9):
+        for x in range(9):
+            if x % 3 == 0 and x > 0:
+                print("|", end="")
+            print(f" {solution[y, x]} ", end="")
+        if y == 8:
+            continue
+        if (y + 1) % 3 == 0:
+            print("\n---------+---------+---------")
+        else:
+            print("\n         |         |         ")
+    

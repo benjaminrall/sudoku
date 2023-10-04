@@ -1,6 +1,7 @@
 import pygame
 import os
 from personallib.camera import Camera
+from solver import SudokuSolver
 
 # Constants
 WIN_WIDTH = 800
