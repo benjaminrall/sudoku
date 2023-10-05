@@ -3,6 +3,7 @@
 import pygame
 import copy
 import numpy as np
+from solver import SudokuSolver
 
 BLACK = (0, 0, 0)
 
@@ -16,7 +17,8 @@ class SudokuBoard:
         "hovering": (180, 180, 180),
         "selected": (120, 120, 160),
         "connected": (200, 200, 200),
-        "text": (0, 0, 0)
+        "text": (0, 0, 0),
+        "incorrect": (255, 150, 150),
     }
 
     # Dark mode colour scheme
@@ -26,7 +28,8 @@ class SudokuBoard:
         "hovering": (43, 43, 55),
         "selected": (35, 75, 80),
         "connected": (38, 38, 50),
-        "text": (200, 200, 200)
+        "text": (200, 200, 200),
+        "incorrect": (100, 20, 20),
     }
 
     def __init__(self, cell_size: int, pos: tuple[int, int], colours: dict = DARK_MODE):
@@ -62,6 +65,7 @@ class SudokuBoard:
         self.selected = None
         self.hovering = None
         self.connected = set()
+        self.incorrect = set()
 
         # Stack to store all moves made on the sudoku
         self.moves = []
@@ -145,9 +149,15 @@ class SudokuBoard:
         # Calculates and returns the row and column index of the position
         return bx * 3 + cx, by * 3 + cy
 
-    def set_sudoku(self, sudoku: np.ndarray) -> None:
+    def set_sudoku(self, sudoku: np.ndarray) -> bool:
         """Sets the sudoku puzzle to render on the board."""
+        # Checks that the sudoku is valid and possible
+        if SudokuSolver.count_solutions(sudoku, 2) != 1:
+            return False
+
+        # Sets the sudoku and stores its solution
         self.sudoku = sudoku
+        self.solution = SudokuSolver.solve(sudoku.copy())
 
         # Creates a mask of the locked cells on the sudoku grid
         self.locked = (sudoku > 0).astype(bool)
@@ -156,17 +166,37 @@ class SudokuBoard:
         self.hovering = None
         self.selected = None
         self.connected = set()
+        self.incorrect = set()
 
         # Resets moves stack
         self.moves = []
+        return True
+
+    def check_solution(self) -> bool:
+        """Checks whether the current state of the sudoku matches the solution."""
+        return (self.sudoku == self.solution).all()
+    
+    def check_valid(self, pos: tuple[int, int]) -> bool:
+        """Checks whether a given position in the sudoku is currently correct."""
+        return self.sudoku[pos] == self.solution[pos]
+    
+    def calculate_incorrect(self) -> set[tuple]:
+        """Calculates the positions of all incorrect cells in the sudoku."""
+        condition = np.logical_and(self.sudoku != self.solution, self.sudoku != 0)
+        return [(x, y) for y, x in zip(*np.where(condition))]
 
     def clear(self) -> None:
         """Clears the current sudoku puzzle, resetting it to its starting value."""
+        # Stores the 'clear' move on the stack and reverts the board to only contain locked values
         self.moves.append((1, copy.copy(self.sudoku)))
         self.sudoku[np.logical_not(self.locked)] = 0
-        
+
+        # Recalculates incorrect cells
+        self.incorrect = self.calculate_incorrect()
+
 
     def undo(self) -> None:
+        """Undoes actions in the reverse order to which they were taken."""
         # Ensures no error is caused by attempting to undo a move that doesn't exist
         if len(self.moves) == 0:
             return
@@ -180,32 +210,48 @@ class SudokuBoard:
         else:
             # Undoes the 'clear' move, resetting the entire board
             self.sudoku[:, :] = last_move[1]
+
+        # Recalculates incorrect cells
+        self.incorrect = self.calculate_incorrect()
         
+    def calculate_connected(self, pos: tuple[int, int]) -> set[tuple]:
+        """Calculates the positions of all cells connected to a given cell."""
+        connected = set()
+
+        # A None position has no connections
+        if pos is None:
+            return connected
+    
+        # Adds all cells in the same column
+        for col in range(9):
+            connected.add((pos[0], col))
+
+        # Adds all cells in the same row
+        for row in range(9):
+            connected.add((row, pos[1]))
+
+        # Adds all cells in the same block
+        bx, by = pos[0] // 3 * 3, pos[1] // 3 * 3
+        for row in range(3):
+            for col in range(3):
+                connected.add((bx + row, by + col))
+
+        return connected
 
     def select(self, pos: tuple[int, int]) -> None:
         """Selects the cell at the given surface position."""
-        self.selected = self.convert_surface_pos(pos)
-        self.connected = set()
-
-        # Calculates the indices of the cells connected to the selected cell
-        if self.selected is not None:
-            # Adds all cells in the same column
-            for col in range(9):
-                self.connected.add((self.selected[0], col))
-
-            # Adds all cells in the same row
-            for row in range(9):
-                self.connected.add((row, self.selected[1]))
-
-            # Adds all cells in the same block
-            bx, by = self.selected[0] // 3 * 3, self.selected[1] // 3 * 3
-            for row in range(3):
-                for col in range(3):
-                    self.connected.add((bx + row, by + col))
+        self.selected = self.convert_surface_pos(pos) if pos else None
+        self.connected = self.calculate_connected(self.selected)
 
     def hover(self, pos: tuple[int, int]) -> None:
         """Hovers the cell at the given surface position."""
-        self.hovering = self.convert_surface_pos(pos)
+        self.hovering = self.convert_surface_pos(pos) if pos else None
+
+    def deselect_all(self) -> None:
+        """Deselects the currently selected cell and removes its connected cells."""
+        self.selected = None
+        self.hovering = None
+        self.connected = set()
 
     def clear_selected_cell(self) -> None:
         """Clears the currently selected cell if it isn't locked."""
@@ -214,8 +260,11 @@ class SudokuBoard:
         if self.selected is not None and not self.locked[si]:
             self.moves.append((0, si, self.sudoku[si]))
             self.sudoku[si] = 0
+
+            # Recalculates incorrect cells
+            self.incorrect = self.calculate_incorrect()
     
-    def set_selected_cell(self, i: int) -> None:
+    def set_selected_cell(self, i: int) -> bool:
         """Sets the currently selected cell to a given value if it isn't locked."""
         # Ensures the value is valid
         if i < 1 or i > 9:
@@ -227,6 +276,29 @@ class SudokuBoard:
             self.moves.append((0, si, self.sudoku[si]))
             self.sudoku[si] = i
 
+            # Recalculates incorrect cells
+            self.incorrect = self.calculate_incorrect()
+
+            # Checks if the move was valid
+            if not self.check_valid(si):
+                return False
+        
+        return True
+
+    def move_selection(self, movement: tuple[int, int]) -> None:
+        """Moves the selection by a given amount"""
+        # Nothing can happen if there is no current selection
+        if self.selected is None:
+            return
+
+        # Calculates the adjusted x and y values
+        x, y = self.selected[0] + movement[0], self.selected[1] + movement[1]
+
+        # Clips values to be within the grid and sets it to be the new selected cell
+        self.selected = tuple(np.clip((x, y), 0, 8))
+        self.connected = self.calculate_connected(self.selected)
+
+
     def draw(self, surface: pygame.Surface) -> None:
         """Draws a sudoku to the given surface at a specified position.
         
@@ -236,7 +308,6 @@ class SudokuBoard:
             surface (pygame.Surface): the surface on which the board will be drawn.
         """
         surface.fill(self.colours["background"])
-
         surface.blit(self.render(), self.pos)
 
     def centre(self, row, col, surface: pygame.Surface):
@@ -263,6 +334,10 @@ class SudokuBoard:
         # Fills in selected cells
         if self.selected is not None:
             pygame.draw.rect(surface, self.colours["selected"], self.cell_rects[self.selected])
+
+        # Fills in incorrect cells
+        for pos in self.incorrect:
+            pygame.draw.rect(surface, self.colours["incorrect"], self.cell_rects[pos])
         
         # Draws text surfaces to the grid
         for row in range(9):
