@@ -26,7 +26,7 @@ pygame.font.init()
 # Objects
 cam = Camera(win, 0, 0, 1)
 ui = Canvas(WIN_WIDTH, WIN_HEIGHT)
-board = Board(BOARD_POS, TILE_SIZE, Board.DIFFICULTIES["easy"], Board.DARK_MODE)
+board = Board(BOARD_POS, TILE_SIZE, Board.DIFFICULTIES["easy"], Board.LIGHT_MODE)
 
 # Variables
 running = True
@@ -58,7 +58,7 @@ if __name__ == '__main__':
                 if event.key == pygame.K_r and won:
                     won = False
                     ui.set_visible(False)
-                    board = Board(BOARD_POS, TILE_SIZE, Board.DIFFICULTIES["hard"], Board.DARK_MODE)
+                    board = SudokuBoard(BOARD_POS, TILE_SIZE, SudokuBoard.DIFFICULTIES["hard"], SudokuBoard.DARK_MODE)
                 elif board.selected:
                     if event.key == pygame.K_BACKSPACE or event.key == pygame.K_DELETE:
                         board.selectedTile.clear_number()
@@ -71,7 +71,7 @@ if __name__ == '__main__':
             won = True
             ui.set_visible(True)
 
-        win.fill((10, 10, 10))
+        win.fill((240, 240, 240))
 
         board.draw(cam)
         ui.update(cam)

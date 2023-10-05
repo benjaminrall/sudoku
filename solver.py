@@ -15,7 +15,7 @@ class SudokuConstraints:
 
         # Arrays to store each column's size and whether they've been covered
         self.sizes = np.full(columns_n, 0)
-        self.covered = np.full(columns_n, 0)        
+        self.covered = np.full(columns_n, 0)
 
         # The max size a column can be
         self.max_size = rows_n
@@ -138,7 +138,7 @@ class SudokuConstraints:
 
         Args:
             solution (list[int]): a list passed by reference, in which the action
-            to reach the solution will be stored if one is found.
+            to reach a solution will be stored if one is found.
 
         Returns:
             bool: whether a solution was found.
@@ -153,6 +153,9 @@ class SudokuConstraints:
         # Covers the column to remove it from the table
         self.cover(column)
 
+        # Keeps track of whether a solution has been found yet
+        solution_found = False
+
         # Goes through each row in the column nondeterministically
         while (node := (row := self.down[row])) != column:
             # Covers all columns in the row
@@ -163,22 +166,133 @@ class SudokuConstraints:
             if self.solve(solution):
                 # If a solution was found, adds the action for the row to the solution
                 solution.append(self.actions[row])
-                return True
+                solution_found = True
 
             # Reverts changes by uncovering all columns in the row
             while (node := self.left[node]) != row:
                 self.uncover(self.columns[node])
-        
-        # Uncovers the column to restore the original state, and returns that no solution was found
-        self.uncover(column)
-        return False
 
-class SudokuSolver():
+            # No need to continue checking rows if a solution has been found
+            if solution_found:
+                break
+        
+        # Uncovers the column to restore the original state, and returns whether a solution was found
+        self.uncover(column)
+        return solution_found
+
+    def solve_randomly(self, solution: list[int]) -> bool:
+        """Implements Donald Knuth's 'Algorithm X' for solving the exact cover problem,
+        using the dancing links method to find a random solution which satisfies all of the constraints.
+
+        Args:
+            solution (list[int]): a list passed by reference, in which the action
+            to reach a solution will be stored if one is found.
+
+        Returns:
+            bool: whether a solution was found.
+        """
+        # If all constraints have been covered, a solution has been found
+        if self.covered.all():
+            return True
+
+        # The next best column is one which hasn't yet been covered, and has the smallest size
+        row = column = np.argmin(np.where(self.covered, self.max_size, self.sizes))
+        
+        # Covers the column to remove it from the table
+        self.cover(column)
+
+        # Keeps track of whether a solution has been found yet
+        solution_found = False
+
+        # Creates a list containing all of the rows in a random order
+        rows = []
+        while (row := self.down[row]) != column:
+            rows.append(row)
+        np.random.shuffle(rows)
+
+        # Goes through each row in the column
+        for row in rows:
+            # Covers all columns in the row
+            node = row
+            while (node := self.right[node]) != row:
+                self.cover(self.columns[node])
+
+            # Recursively calls solve using the adjusted table
+            if self.solve(solution):
+                # If a solution was found, adds the action for the row to the solution
+                solution.append(self.actions[row])
+                solution_found = True
+
+            # Reverts changes by uncovering all columns in the row
+            while (node := self.left[node]) != row:
+                self.uncover(self.columns[node])
+
+            # No need to continue checking rows if a solution has been found
+            if solution_found:
+                break
+
+        # Uncovers the column to restore the original state, and returns whether a solution was found
+        self.uncover(column)
+        return solution_found
+
+    def count_solutions(self, limit: int = -1) -> int:
+        """Implements Donald Knuth's 'Algorithm X' for solving the exact cover problem,
+        using the dancing links method to find and count all solutions which satisfy the constraints.
+
+        Args:
+            limit (int): an integer defining the limit for how many solutions to count before returning.
+
+        Returns:
+            int: the amount of solutions that were found.
+        """
+        # If all constraints have been covered, a solution has been found
+        if self.covered.all():
+            return 1
+
+        # The next best column is one which hasn't yet been covered, and has the smallest size
+        row = column = np.argmin(np.where(self.covered, self.max_size, self.sizes))
+        
+        # Covers the column to remove it from the table
+        self.cover(column)
+
+        # Keeps track of whether a solution has been found yet
+        solutions_found = 0
+
+        # Goes through each row in the column nondeterministically
+        while (node := (row := self.down[row])) != column:
+            # Covers all columns in the row
+            while (node := self.right[node]) != row:
+                self.cover(self.columns[node])
+
+            # Recursively counts the solutions using the adjusted table
+            solutions_found += self.count_solutions(limit)
+
+            # Reverts changes by uncovering all columns in the row
+            while (node := self.left[node]) != row:
+                self.uncover(self.columns[node])
+
+            # Checks if the solutions found exceeds the limit
+            if limit > 0 and solutions_found >= limit:
+                # If so, restricts solutions found counter to equal the limit and exits the loop
+                solutions_found = limit
+                break
+        
+        # Uncovers the column to restore the original state, and returns the number of solutions found
+        self.uncover(column)
+        return solutions_found
+
+class SudokuSolver:
+    """A class that provides static methods for finding and counting solutions to sudoku puzzles."""
+
     def __call__(self, sudoku: np.ndarray) -> np.ndarray:
+        return self.solve(sudoku)
+    
+    @staticmethod
+    def solve(sudoku: np.ndarray) -> np.ndarray:
         """Solves a given sudoku puzzle and returns its solution.
 
         Args:
-            sudoku (np.ndarray): 9x9 numpy array representing the sudku grid.
+            sudoku (np.ndarray): 9x9 numpy array representing the sudoku grid.
             Empty cells are stored as 0.
 
         Returns:
@@ -188,10 +302,10 @@ class SudokuSolver():
 
         # Creates the constraints for the sudoku puzzle
         constraints = SudokuConstraints(sudoku)
-
+        
         # Attempts to find a solution that satisfies the constraints
         solution_actions = []
-        if constraints.solve(solution_actions):
+        if constraints.solve_randomly(solution_actions):
             # If a solution was found, the actions are carried out to complete the sudoku
             for row, col, n in solution_actions:
                 sudoku[row, col] = n
@@ -200,6 +314,20 @@ class SudokuSolver():
             sudoku[:] = -1
         
         return sudoku
+    
+    @staticmethod
+    def count_solutions(sudoku: np.ndarray, limit: int = -1) -> int:
+        """Counts the number of solutions to a given sudoku puzzle.
+        
+        Args:
+            sudoku (np.ndarray): 9x9 numpy array representing the sudoku grid.
+            Empty cells are stored as 0.
+            limit (int): an integer defining the limit for how many solutions to count before returning.
+
+        Returns:
+            int: the amount of solutions that were found.
+        """
+        return SudokuConstraints(sudoku).count_solutions(limit)
     
 if __name__ == '__main__':
     argv = sys.argv[1:]
@@ -215,7 +343,7 @@ if __name__ == '__main__':
         exit()
 
     # Gets the sudoku string from command line arguments
-    sudoku_string = argv[0]
+    sudoku_string = argv[0].replace('.', '0')
 
     # Ensures sudoku string is of the correct format
     if len(sudoku_string) != 81 or not sudoku_string.isnumeric():
@@ -236,24 +364,20 @@ if __name__ == '__main__':
     sudoku = np.array(list(sudoku_string), dtype=int).reshape((9, 9))
 
     # Solves the given sudoku
-    solver = SudokuSolver()
-    solution = solver(sudoku)
-
-    # Outputs solution as a string in the same format as the input if print mode is 0
+    solution = SudokuSolver.solve(sudoku)
+    
+    # Outputs solution in a string format if print mode is 0
     if print_mode == 0:
         print(''.join(map(str, solution.reshape(-1))))
         exit()
 
-    # Pretty prints the sudoku grid for easy reading
+    # Pretty prints the solution for easy reading if print mode is 1
     for y in range(9):
+        # Prints the entire current row
         for x in range(9):
             if x % 3 == 0 and x > 0:
                 print("|", end="")
-            print(f" {solution[y, x]} ", end="")
-        if y == 8:
-            continue
-        if (y + 1) % 3 == 0:
-            print("\n---------+---------+---------")
-        else:
-            print("\n         |         |         ")
-    
+            print(f"{solution[y, x]}", end="")
+        
+        # Prints row divider if necessary
+        print("\n---+---+---" if (y + 1) % 3 == 0 and y < 8 else "")

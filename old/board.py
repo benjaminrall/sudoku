@@ -22,7 +22,7 @@ class Board:
     }
 
     DIFFICULTIES = {
-        "easy": 50,
+        "easy": 80,
         "normal": 42,
         "hard": 34,
         "expert": 25,
@@ -73,13 +73,21 @@ class Board:
         for x in range(1, self.boardSize, 5 + 3 * self.tileSize):
             pygame.draw.line(self.surface, (0, 0, 0), (x, 0), (x, self.boardSize), 3)
             pygame.draw.line(self.surface, (0, 0, 0), (0, x), (self.boardSize, x), 3)
+
+        # Fills cells connected to the selected cell
         if self.selected:
             for pos in self.tiles[self.selected[1]][self.selected[0]].connected:
                 pygame.draw.rect(self.surface, self.colours["connected"], self.drawRects[pos[1]][pos[0]])
+        
+        # Fills cell being hovered over
         if self.hovering:
             pygame.draw.rect(self.surface, self.colours["hovering"], self.drawRects[self.hovering[1]][self.hovering[0]])
+        
+        # Fills currently selected cell
         if self.selected:
             pygame.draw.rect(self.surface, self.colours["selected"], self.drawRects[self.selected[1]][self.selected[0]])
+        
+        # Draws numbers
         for r, row in enumerate(self.tiles):
             for c, tile in enumerate(row):
                 if tile.numberSurface:
