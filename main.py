@@ -2,7 +2,6 @@
 
 import pygame
 import os
-import copy
 import numpy as np
 import argparse
 import time
@@ -26,6 +25,7 @@ def set_sudoku(board: SudokuBoard, sudoku=None) -> tuple[np.ndarray, np.ndarray]
     return sudoku, solution
 
 def sudoku_argument(arg: str) -> np.ndarray | None:
+    """Parses the sudoku string command line argument."""
     if arg is None:
         return arg
 
@@ -48,6 +48,7 @@ def sudoku_argument(arg: str) -> np.ndarray | None:
     return sudoku
 
 def dimensions_argument(arg: str) -> int:
+    """Parses the dimensions command line argument."""
     value = int(arg)
     if value < MINIMUM_DIMENSIONS:
         raise argparse.ArgumentTypeError(
@@ -55,11 +56,18 @@ def dimensions_argument(arg: str) -> int:
     return value
 
 def framerate_argument(arg: str) -> int:
+    """Parses the framerate command line argument."""
     value = int(arg)
     if value < MINIMUM_FRAMERATE:
         raise argparse.ArgumentTypeError(
             f"value must be greater than {MINIMUM_FRAMERATE}")
     return value
+
+def seconds_to_minutes(seconds: int) -> str:
+    """Converts a given number of seconds to a minute:seconds string."""
+    minutes = seconds // 60
+    seconds %= 60
+    return "%d:%02d" % (minutes, seconds)
 
 # Main Loop
 if __name__ == '__main__':
@@ -100,13 +108,16 @@ if __name__ == '__main__':
     win_text_font = pygame.font.SysFont("", int(tile_size * 0.8))
 
     # Sets up the board and creates the starting sudoku
-    start_time = time.time()
     board = SudokuBoard(tile_size, board_pos, appearance)
     sudoku, solution = set_sudoku(board, sudoku)
+    
+    ui_font = pygame.font.SysFont("", tile_size)
+    victory_text = ui_font.render("Sudoku complete!", True, board.colours["text"])
 
     # Initialises loop variables
     running = True
     over = False
+    start_time = time.time()
 
     # Main game loop
     while running:
@@ -130,6 +141,7 @@ if __name__ == '__main__':
                     # Resets the sudoku when the 'R' key is pressed
                     over = False
                     sudoku, solution = set_sudoku(board)
+                    start_time = time.time()
                 elif event.key == pygame.K_SPACE and not over:
                     # Allows the board to be cleared using the space key
                     board.clear()
@@ -156,9 +168,16 @@ if __name__ == '__main__':
         board.draw(window)
 
         # Detects if the game is over
-        over = board.check_solution()
-        if over: 
+        if not over and board.check_solution():
+            over = True 
+            time_elapsed = time.time() - start_time
             board.deselect_all()
+            time_text = ui_font.render(f"Time elapsed: {seconds_to_minutes(time_elapsed)}", True, board.colours["text"])
+
+        # Displays UI text for victory and time elapsed when a sudoku is completed
+        if over:
+            window.blit(victory_text, ((win_size - victory_text.get_width()) // 2, int(1.2 * tile_size)))
+            window.blit(time_text, ((win_size - time_text.get_width()) // 2, win_size - 2 * tile_size))
         
         # Update the display after everything has been drawn
         pygame.display.update()
