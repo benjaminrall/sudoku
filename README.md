@@ -14,12 +14,12 @@ To solve any sudoku, it can be passed as a command line argument when running th
 By default, the result will be another sudoku string in the same form as the input. A second optional command line argument can be specified to change the printing style - 0 (default) will result in a sudoku string, and 1 will result in a pretty printed grid, making the solution easily readable.
 
 #### Examples
-```bash
+```
 >>> py solver.py 000000010400000000020000000000050407008000300001090000300400200050100000000806000
 693784512487512936125963874932651487568247391741398625319475268856129743274836159
 ```
 
-```bash
+```
 >>> py solver.py 000801000000000043700000000000050800020030000000000100600000075003400000000200600 1
 235|841|796
 186|597|243
@@ -42,12 +42,12 @@ Sudokus generated tend to have between 20 and 28 clues, but this can vary. The s
 
 #### Examples
 
-```bash
+```
 >>> py generator.py
 004100008010034050030000000000060705000400000069870000203000000001950307000002800
 ```
 
-```bash
+```
 >>> py generator.py 1
   5|  8|  9
 79 |  4|   
@@ -93,13 +93,13 @@ When the complete solution is entered, congratulations text will appear along wi
 
 #### Examples
 
-```bash
+```
 py main.py -s 000801000000000043700000000000050800020030000000000100600000075003400000000200600
 ```
 
 ![Example 1](/imgs/example_1.png)
 
-```bash
+```
 py main.py -a 1
 ```
 
